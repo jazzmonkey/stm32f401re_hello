@@ -65,6 +65,7 @@ LDFLAGS += -T"$(STM32CUBEF4_PATH)/Projects/STM32F401RE-Nucleo/Applications/EEPRO
 C_SRCS =
 C_SRCS += $(REPO_PATH)/main.c
 C_SRCS += $(REPO_PATH)/bsp.c
+C_SRCS += $(REPO_PATH)/syscalls.c
 C_SRCS += $(REPO_PATH)/st/stm32f4xx_it.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.c
@@ -77,6 +78,7 @@ C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
+C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/CMSIS/Device/ST/STM32F4xx/Source/Templates/system_stm32f4xx.c
 

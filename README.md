@@ -11,7 +11,7 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
     - gdb-multiarch
     - libnewlib-arm-none-eabi
 3.  Hardware Target:  STM32 Nucleo-64 with STM32F401RE
-    - https://www.st.com/en/evaluation-tools/nucleo-f401re.html#cad-resources
+    - https://www.st.com/en/evaluation-tools/nucleo-f401re.html
 4.  Build commands (from root of cloned repo):
     - make
     - openocd -f ./openocd.cfg

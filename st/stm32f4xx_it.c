@@ -36,6 +36,7 @@
  **********************************************************************************************************************/
 extern TIM_HandleTypeDef tim_drv_handle;
 extern EXTI_HandleTypeDef exti_user_pb_handle;
+extern UART_HandleTypeDef uart_drv_handle;
 
 /***********************************************************************************************************************
  * API FUNCTIONS
@@ -57,4 +58,9 @@ void EXTI15_10_IRQHandler(void)
     {
         HAL_EXTI_IRQHandler(&exti_user_pb_handle);
     }
+}
+
+void USART2_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&uart_drv_handle);
 }

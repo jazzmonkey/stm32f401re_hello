@@ -54,6 +54,7 @@ static void* bsp_user_pb_cb_arg = NULL;
  **********************************************************************************************************************/
 TIM_HandleTypeDef tim_drv_handle;
 EXTI_HandleTypeDef exti_user_pb_handle;
+UART_HandleTypeDef uart_drv_handle;
 
 /***********************************************************************************************************************
  * LOCAL FUNCTIONS
@@ -222,6 +223,28 @@ static void bsp_exti_user_pb_cb(void)
     return;
 }
 
+static void bsp_uart_init(void)
+{
+    uart_drv_handle.Instance          = USART2;
+    uart_drv_handle.Init.BaudRate     = 115200;
+    uart_drv_handle.Init.WordLength   = UART_WORDLENGTH_8B;
+    uart_drv_handle.Init.StopBits     = UART_STOPBITS_1;
+    uart_drv_handle.Init.Parity       = UART_PARITY_NONE;
+    uart_drv_handle.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
+    uart_drv_handle.Init.Mode         = UART_MODE_TX_RX;
+    uart_drv_handle.Init.OverSampling = UART_OVERSAMPLING_16;
+
+    if(HAL_UART_Init(&uart_drv_handle) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    // Setup UART to Receive
+    //HAL_UART_Receive_IT(&uart_drv_handle, uart_rx_state.packet_buffer, 1);
+
+    return;
+}
+
 /***********************************************************************************************************************
  * MCU HAL FUNCTIONS
  *
@@ -314,6 +337,133 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     return;
 }
 
+void HAL_UART_MspInit(UART_HandleTypeDef *huart)
+{
+    GPIO_InitTypeDef  GPIO_InitStruct;
+
+    USART2_TX_GPIO_CLK_ENABLE();
+    USART2_RX_GPIO_CLK_ENABLE();
+
+    USART2_CLK_ENABLE();
+
+    GPIO_InitStruct.Pin       = USART2_TX_PIN;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
+    GPIO_InitStruct.Alternate = USART2_TX_AF;
+
+    HAL_GPIO_Init(USART2_TX_GPIO_PORT, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = USART2_RX_PIN;
+    GPIO_InitStruct.Alternate = USART2_RX_AF;
+
+    HAL_GPIO_Init(USART2_RX_GPIO_PORT, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(USART2_IRQn, USART2_IRQ_PREPRIO, 1);
+    HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+    return;
+}
+
+void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
+{
+    USART2_FORCE_RESET();
+    USART2_RELEASE_RESET();
+
+    HAL_GPIO_DeInit(USART2_TX_GPIO_PORT, USART2_TX_PIN);
+    HAL_GPIO_DeInit(USART2_RX_GPIO_PORT, USART2_RX_PIN);
+
+    HAL_NVIC_DisableIRQ(USART2_IRQn);
+
+    return;
+}
+
+void process_uart_tx(void)
+{
+    bsp_fifo_t *fifo = &(uart_tx_channels[0].fifo);
+    uint32_t tx_size_bytes = 0;
+    uint8_t *tx_buffer;
+
+    // Update out_index
+    fifo->out_index += uart_drv_handle.TxXferSize;
+    if (fifo->out_index >= fifo->size)
+    {
+        fifo->out_index = 0;
+    }
+
+    // Determine if buffer is not empty
+    if (fifo->out_index != fifo->in_index)
+    {
+        // Calculate next TX size
+        if (fifo->in_index >= fifo->out_index)
+        {
+            tx_size_bytes = fifo->in_index - fifo->out_index;
+        }
+        else
+        {
+            tx_size_bytes = fifo->size - fifo->out_index;
+        }
+
+        tx_buffer = fifo->buffer + fifo->out_index;
+        HAL_UART_Transmit_IT(&uart_drv_handle, tx_buffer, tx_size_bytes);
+    }
+    else
+    {
+        uart_tx_state.packet_state = BSP_UART_STATE_PACKET_STATE_IDLE;
+    }
+
+    return;
+}
+
+void process_uart_rx(void)
+
+{
+    bsp_fifo_t *fifo = &(uart_rx_channels[0].fifo);
+
+    // Update fifo
+    fifo->buffer[fifo->in_index++] = uart_rx_state.packet_buffer[0];
+    fifo->in_index %= fifo->size;
+    fifo->level++;
+
+    // If fifo is not full
+    if (fifo->level < fifo->size)
+    {
+        HAL_UART_Receive_IT(&uart_drv_handle, uart_rx_state.packet_buffer, 1);
+    }
+
+    return;
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+    if (UartHandle->Instance == USART2)
+    {
+        process_uart_tx();
+    }
+
+    return;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+    if (UartHandle->Instance == USART2)
+    {
+        process_uart_rx();
+    }
+
+    return;
+}
+
+ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
+{
+    if (UartHandle->Instance == USART2)
+    {
+        Error_Handler();
+    }
+
+    return;
+}
+
 /***********************************************************************************************************************
  * API FUNCTIONS
  **********************************************************************************************************************/
@@ -322,6 +472,7 @@ uint32_t bsp_init(void)
     HAL_Init();
     bsp_system_clock_config();
     bsp_tim2_init();
+    bsp_uart_init();
 
     bsp_set_gpio(BSP_GPIO_ID_LD2, BSP_GPIO_LOW);
 
@@ -393,3 +544,100 @@ uint32_t bsp_register_user_pb_cb(bsp_callback_t cb, void *cb_arg)
 
     return BSP_STATUS_OK;
 }
+
+#if 0
+int __io_putc(int file, int ch)
+{
+    bsp_fifo_t *fifo = &(uart_tx_channels[BSP_UART_TX_CHANNEL_INDEX_STDOUT].fifo);
+    int ret = ch;
+
+    if ((file == TEST_FILE_HANDLE) ||
+        (file == COVERAGE_FILE_HANDLE) ||
+        (file == STDOUT_FILENO) ||
+        (file == BRIDGE_WRITE_FILE_HANDLE))
+    {
+        uint32_t temp_out_index;
+
+        __disable_irq();
+        temp_out_index = fifo->out_index;
+        __enable_irq();
+
+        // If buffer is not full
+        if ((fifo->in_index + 1) % fifo->size != temp_out_index)
+        {
+            // If UART is not transmitting, then kick off transmit
+            if (uart_tx_state.packet_state == BSP_UART_STATE_PACKET_STATE_IDLE)
+            {
+                uint32_t hal_ret;
+
+                fifo->buffer[fifo->in_index] = ch;
+
+                uart_tx_state.packet_state = BSP_UART_STATE_PACKET_STATE_PAYLOAD;
+                hal_ret = HAL_UART_Transmit_IT(&uart_drv_handle, &(fifo->buffer[fifo->in_index]), 1);
+                if (hal_ret != HAL_OK)
+                {
+                    uart_tx_state.packet_state = BSP_UART_STATE_PACKET_STATE_IDLE;
+                    errno = EIO;
+                    ret = EOF;
+                }
+                else
+                {
+                    fifo->in_index++;
+                    fifo->in_index %= fifo->size;
+                }
+            }
+            else
+            {
+                // Update input index and add char
+                fifo->buffer[fifo->in_index++] = ch;
+                fifo->in_index %= fifo->size;
+            }
+        }
+        else
+        {
+            errno = EIO;
+            ret = EOF;
+        }
+    }
+    else
+    {
+        errno = EBADF;
+        ret = EOF;
+    }
+
+    return ret;
+}
+
+int __io_getc(int file)
+{
+    bsp_fifo_t *fifo = &(uart_rx_channels[BSP_UART_RX_CHANNEL_INDEX_STDIN].fifo);
+    int32_t ret = EOF;
+
+    if ((file == TEST_FILE_HANDLE) ||
+        (file == COVERAGE_FILE_HANDLE) ||
+        (file == STDIN_FILENO) ||
+        (file == BRIDGE_READ_FILE_HANDLE))
+    {
+        __disable_irq();
+
+        if (fifo->level > 0)
+        {
+            ret = fifo->buffer[fifo->out_index++];
+            fifo->out_index %= fifo->size;
+            fifo->level--;
+        }
+        else
+        {
+            errno = 0;
+        }
+
+        __enable_irq();
+    }
+    else
+    {
+        errno = EBADF;
+    }
+
+    return ret;
+}
+#endif
