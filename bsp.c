@@ -36,6 +36,16 @@
 #define BSP_TIM2_STATE_FIRST_CB                     (0x1)
 #define BSP_TIM2_STATE_TIMEOUT                      (0x2)
 
+typedef struct
+{
+    uint32_t size;
+    uint32_t in_index;
+    uint32_t out_index;
+    uint32_t level;
+    uint32_t level_pending;
+    uint8_t *buffer;
+} bsp_fifo_t;
+
 /***********************************************************************************************************************
  * LOCAL VARIABLES
  **********************************************************************************************************************/
