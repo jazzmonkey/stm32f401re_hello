@@ -61,7 +61,7 @@
 //#undef errno
 extern int errno;
 extern int __io_getc(int file);
-extern int __io_putc(int file, int ch);
+extern int __io_putchar(int ch);
 
 register char * stack_ptr asm("sp");
 
@@ -126,7 +126,7 @@ int _write(int file, char *ptr, int len)
 
     for (i = 0; i < len; i++)
     {
-        ret = __io_putc(file, *ptr++);
+        ret = __io_putchar(*ptr++);
         if (ret == EOF)
         {
             break;

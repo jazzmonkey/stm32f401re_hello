@@ -80,6 +80,7 @@ int main(void)
     bsp_init();
     bsp_register_user_pb_cb(app_pb_pressed_callback, NULL);
     bsp_set_timer(500, app_timeout_callback, NULL);
+    printf("Hello world!\n\r");
 
     while (1)
     {

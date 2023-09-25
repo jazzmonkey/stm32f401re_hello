@@ -10,9 +10,11 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
     - binutils-arm-none-eabi
     - gdb-multiarch
     - libnewlib-arm-none-eabi
-3.  Hardware Target:  STM32 Nucleo-64 with STM32F401RE
+    - putty (for COM port)
+3.  Saleae Logic software
+4.  Hardware Target:  STM32 Nucleo-64 with STM32F401RE
     - https://www.st.com/en/evaluation-tools/nucleo-f401re.html
-4.  Build commands (from root of cloned repo):
+5.  Build commands (from root of cloned repo):
     - make
     - openocd -f ./openocd.cfg
     - gdb-multiarch -x ./gdb.txt
@@ -47,3 +49,21 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
 - Root case - confirmed
     - Added counter to HAL_TIM_PeriodElapsedCallback - it's called 2x after call to Timer_Start
     - had to include if (bsp_timer_has_started) logic in IRQ handler
+
+3.  Added printf capabilities, but nothing out the UART
+- Added syscalls.c and overrode _write(), calling into bsp.c:__io_putchar()
+- Added calls to UART HAL code and implemented ISR handlers
+- Added UART TX FIFO handling
+- But nothing captured by Logic16 out of UART
+    - Checked that call stack from printf->...->UART HAL TX code is working
+    - Checked that UART TX FIFO is being populated correctly with printf() data
+    - Found that UART TX IRQ was not firing
+    - Sanity check - check that Logic16 is capturing, so set to GPIO for LD2 to capture toggle
+    - when i only put BP in UART TX IRQ, it fires
+    - I put analog channel of Logic16 and found 1V - contention with USB-COM port attached
+    - I still don't capture anything on UART TX
+    - Switched to probing off CN3.RX (routed to MCU USART2 TX) instead of CN10.35
+    - Found that SB62/SB63 are not populated by default, so PA2/PA3 is not probe-able on CN10
+
+4.  If UART TX buffer smaller than printf() string, only length of buffer is TX
+

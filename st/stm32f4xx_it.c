@@ -62,5 +62,5 @@ void EXTI15_10_IRQHandler(void)
 
 void USART2_IRQHandler(void)
 {
-  HAL_UART_IRQHandler(&uart_drv_handle);
+    HAL_UART_IRQHandler(&uart_drv_handle);
 }
