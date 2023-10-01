@@ -67,3 +67,26 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
 
 4.  If UART TX buffer smaller than printf() string, only length of buffer is TX
 
+5.  UART RX causes TX to not work
+- no IRQs fired
+- RX and TX FIFOs in default state
+- discovered that HAL_UART_GetState() will return HAL_UART_STATE_BUSY_RX if waiting for RX char, so added that to acceptable states in __io_putchar call to HAL_UART_GetState()
+
+6.  UART RX does not work
+- sending from host ttyUSB0 via PuTTy
+- no RX IRQ fired
+- captured on Logic16 analog - contention on UART RX / PA3
+    - PA3 shows 3.3v without ttyUSB0 TX connected
+    - capturing from open ttyUSB0 TX shows correct data from PuTTy
+- HAL GPIO configuration for PA3 looks correct
+- VCC from USB-UART dongle is 2.7V
+- Switched PuTTy to ttyACM0 - Virtual COM port exposed by ST-Link USB that also routes to PA2/3 for USART2 peripheral
+- still no UART RX IRQ
+- removed erroneous HAL GPIO configuration for PA3
+
+7.  UART RX still does not work
+- UART RX IRQ is firing and capturing correct character from putty
+- stepped through code to find that getchar() was always returning -1, even though UART RX IRQ was firing and __io_getchar was updating the FIFO correctly
+- looked like things were being buffered from syscalls to getchar/scanf
+- had to call setvbuf and set to unbuffered for stdin and stdout
+

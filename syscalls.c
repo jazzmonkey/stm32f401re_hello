@@ -60,7 +60,7 @@
 /* Variables */
 //#undef errno
 extern int errno;
-extern int __io_getc(int file);
+extern int __io_getchar(void);
 extern int __io_putchar(int ch);
 
 register char * stack_ptr asm("sp");
@@ -98,7 +98,7 @@ int _read(int file, char *ptr, int len)
 
     for (i = 0; i < len; i++)
     {
-        ch = __io_getc(file);
+        ch = __io_getchar();
 
         if (ch == EOF)
         {

@@ -38,6 +38,7 @@
  **********************************************************************************************************************/
 static bool bsp_pb_pressed = false;
 static volatile bool app_timeout = false;
+static volatile bool app_getchar = false;
 static bool app_ld2_state_on = false;
 static uint32_t app_state = 0;
 
@@ -69,6 +70,13 @@ void app_timeout_callback(uint32_t status, void *arg)
     return;
 }
 
+void app_getchar_callback(uint32_t status, void *arg)
+{
+    app_getchar = true;
+
+    return;
+}
+
 /***********************************************************************************************************************
  * API FUNCTIONS
  **********************************************************************************************************************/
@@ -79,8 +87,9 @@ int main(void)
 
     bsp_init();
     bsp_register_user_pb_cb(app_pb_pressed_callback, NULL);
+    bsp_register_getchar_cb(app_getchar_callback, NULL);
     bsp_set_timer(500, app_timeout_callback, NULL);
-    printf("Hello world!\n\r");
+    printf("\n\rHello world!\n\r");
 
     while (1)
     {
@@ -103,6 +112,12 @@ int main(void)
 
             bsp_pb_pressed = false;
 
+        }
+
+        if (app_getchar)
+        {
+            printf("%c", getchar());
+            app_getchar = false;
         }
 
         if (app_timeout)
