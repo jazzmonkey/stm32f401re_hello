@@ -45,22 +45,30 @@ extern UART_HandleTypeDef uart_drv_handle;
 void SysTick_Handler(void)
 {
     HAL_IncTick();
+
+    return;
 }
 
 void TIM2_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&tim_drv_handle);
+
+    return;
 }
 
 void EXTI15_10_IRQHandler(void)
 {
-    if (HAL_EXTI_GetPending(&exti_user_pb_handle, EXTI_TRIGGER_RISING))
+    if (HAL_EXTI_GetPending(&exti_user_pb_handle, EXTI_TRIGGER_FALLING))
     {
         HAL_EXTI_IRQHandler(&exti_user_pb_handle);
     }
+
+    return;
 }
 
 void USART2_IRQHandler(void)
 {
     HAL_UART_IRQHandler(&uart_drv_handle);
+
+    return;
 }

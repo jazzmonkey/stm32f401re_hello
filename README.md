@@ -19,6 +19,9 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
     - openocd -f ./openocd.cfg
     - gdb-multiarch -x ./gdb.txt
 
+# Known Issues
+1.  If UART TX buffer smaller than printf() string, only length of buffer is TX
+
 # Revision History
 
 ## Added processing PB and blinking LED; added STM32CubeF4 submodule
@@ -50,7 +53,10 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
     - Added counter to HAL_TIM_PeriodElapsedCallback - it's called 2x after call to Timer_Start
     - had to include if (bsp_timer_has_started) logic in IRQ handler
 
-3.  Added printf capabilities, but nothing out the UART
+## UART TX now working
+
+### Issues Debugged
+1.  Added printf capabilities, but nothing out the UART
 - Added syscalls.c and overrode _write(), calling into bsp.c:__io_putchar()
 - Added calls to UART HAL code and implemented ISR handlers
 - Added UART TX FIFO handling
@@ -65,14 +71,15 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
     - Switched to probing off CN3.RX (routed to MCU USART2 TX) instead of CN10.35
     - Found that SB62/SB63 are not populated by default, so PA2/PA3 is not probe-able on CN10
 
-4.  If UART TX buffer smaller than printf() string, only length of buffer is TX
+## UART RX now working
 
-5.  UART RX causes TX to not work
+### Issues Debugged
+1.  UART RX causes TX to not work
 - no IRQs fired
 - RX and TX FIFOs in default state
 - discovered that HAL_UART_GetState() will return HAL_UART_STATE_BUSY_RX if waiting for RX char, so added that to acceptable states in __io_putchar call to HAL_UART_GetState()
 
-6.  UART RX does not work
+2.  UART RX does not work
 - sending from host ttyUSB0 via PuTTy
 - no RX IRQ fired
 - captured on Logic16 analog - contention on UART RX / PA3
@@ -84,9 +91,20 @@ ST Nucleo-F401RE - Blink LED, process PB, UART TX
 - still no UART RX IRQ
 - removed erroneous HAL GPIO configuration for PA3
 
-7.  UART RX still does not work
+3.  UART RX still does not work
 - UART RX IRQ is firing and capturing correct character from putty
 - stepped through code to find that getchar() was always returning -1, even though UART RX IRQ was firing and __io_getchar was updating the FIFO correctly
 - looked like things were being buffered from syscalls to getchar/scanf
 - had to call setvbuf and set to unbuffered for stdin and stdout
+
+## Debugged EXTI constant triggering
+
+### Issues Debugged
+1.  EXTI constantly triggering
+- GPIOC shows proper status
+- in IRQ handler, clearing EXTI_PR bit (by setting) does not clear it
+- was somehow missing "exti_config.GPIOSel = EXTI_GPIOC;" in HAL_MspInit()
+    - this was causing SYSCFG.EXTICR* to get cleared since default of GPIOSel = 0 means PBA instead of PBC
+    - not quite sure how this was working before.  this all seems to get configured with HAL_GPIO_Init(), however when relying solely on that call to configure EXTI, things still don't work
+
 

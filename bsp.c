@@ -31,7 +31,7 @@
  **********************************************************************************************************************/
 #define BSP_EXTI_PB_USER_PRIO                       (0xF)
 #define BSP_TIM2_PREPRIO                            (0x4)
-#define USART2_IRQ_PREPRIO                          (0xF)
+#define USART2_IRQ_PREPRIO                          (0xE)
 
 #define BSP_TIM2_STATE_RESET                        (0x0)
 #define BSP_TIM2_STATE_FIRST_CB                     (0x1)
@@ -239,7 +239,6 @@ static void bsp_exti_user_pb_cb(void)
         bsp_user_pb_cb(BSP_STATUS_OK, bsp_user_pb_cb_arg);
     }
 
-
     bsp_irq_count++;
 
     return;
@@ -311,10 +310,11 @@ void HAL_MspInit(void)
     exti_config.Line = EXTI_LINE_13;
     exti_config.Mode = EXTI_MODE_INTERRUPT;
     exti_config.Trigger = EXTI_TRIGGER_FALLING;
+    exti_config.GPIOSel = EXTI_GPIOC;
     HAL_EXTI_SetConfigLine(&exti_user_pb_handle, &exti_config);
     HAL_EXTI_RegisterCallback(&exti_user_pb_handle, HAL_EXTI_COMMON_CB_ID, &bsp_exti_user_pb_cb);
-    HAL_NVIC_SetPriority((IRQn_Type)EXTI15_10_IRQn, BSP_EXTI_PB_USER_PRIO, 0x00);
-    HAL_NVIC_EnableIRQ((IRQn_Type)EXTI15_10_IRQn);
+    HAL_NVIC_SetPriority((IRQn_Type) EXTI15_10_IRQn, BSP_EXTI_PB_USER_PRIO, 0x00);
+    HAL_NVIC_EnableIRQ((IRQn_Type) EXTI15_10_IRQn);
 
     return;
 }
@@ -437,6 +437,8 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
         }
     }
 
+    bsp_irq_count++;
+
     return;
 }
 
@@ -461,6 +463,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
         }
     }
 
+    bsp_irq_count++;
+
     return;
 }
 
@@ -470,6 +474,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
     {
         bsp_error_handler();
     }
+
+    bsp_irq_count++;
 
     return;
 }

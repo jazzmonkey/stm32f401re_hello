@@ -30,6 +30,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include "stm32f4xx_hal.h"
 
 /***********************************************************************************************************************
  * LITERALS & CONSTANTS

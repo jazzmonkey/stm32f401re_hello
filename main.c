@@ -36,7 +36,7 @@
 /***********************************************************************************************************************
  * LOCAL VARIABLES
  **********************************************************************************************************************/
-static bool bsp_pb_pressed = false;
+static volatile bool app_pb_pressed = false;
 static volatile bool app_timeout = false;
 static volatile bool app_getchar = false;
 static bool app_ld2_state_on = false;
@@ -53,7 +53,7 @@ void app_pb_pressed_callback(uint32_t status, void *arg)
 {
     if (status == BSP_STATUS_OK)
     {
-        bsp_pb_pressed = !bsp_pb_pressed;
+        app_pb_pressed = !app_pb_pressed;
     }
     else
     {
@@ -93,8 +93,19 @@ int main(void)
 
     while (1)
     {
-        if (bsp_pb_pressed)
+        bool temp_bool;
+
+        __disable_irq();
+        temp_bool = app_pb_pressed;
+        __enable_irq();
+
+        if (temp_bool)
         {
+            app_pb_pressed = false;
+
+            app_state++;
+            app_state %= APP_STATE_MAX;
+
             switch (app_state)
             {
                 case APP_STATE_BLINK_LONG_ON:
@@ -106,21 +117,23 @@ int main(void)
                 default:
                     break;
             }
-
-            app_state++;
-            app_state %= APP_STATE_MAX;
-
-            bsp_pb_pressed = false;
-
         }
 
-        if (app_getchar)
+        __disable_irq();
+        temp_bool = app_getchar;
+        __enable_irq();
+
+        if (temp_bool)
         {
-            printf("%c", getchar());
             app_getchar = false;
+            printf("%c", getchar());
         }
 
-        if (app_timeout)
+        __disable_irq();
+        temp_bool = app_timeout;
+        __enable_irq();
+
+        if (temp_bool)
         {
             uint32_t timer_delay_ms;
             app_timeout = false;
@@ -152,7 +165,6 @@ int main(void)
 
             bsp_set_timer(timer_delay_ms, app_timeout_callback, NULL);
             app_ld2_state_on = !app_ld2_state_on;
-
         }
 
         bsp_sleep();
