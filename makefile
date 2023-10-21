@@ -79,6 +79,8 @@ C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
+C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.c
+C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc_ex.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
 C_SRCS += $(STM32CUBEF4_PATH)/Drivers/CMSIS/Device/ST/STM32F4xx/Source/Templates/system_stm32f4xx.c
 

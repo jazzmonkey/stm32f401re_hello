@@ -117,6 +117,11 @@ int main(void)
                 default:
                     break;
             }
+
+            uint32_t temp;
+            temp = 0;
+            bsp_read_temp(&temp);
+            printf("temp = %d\n\r", (int) temp);
         }
 
         __disable_irq();

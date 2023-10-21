@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <math.h>
 
 /***********************************************************************************************************************
  * LOCAL LITERAL SUBSTITUTIONS
@@ -74,9 +75,10 @@ bsp_char_fifo_t bsp_uart_rx_fifo = {0};
 /***********************************************************************************************************************
  * GLOBAL VARIABLES
  **********************************************************************************************************************/
-TIM_HandleTypeDef tim_drv_handle;
-EXTI_HandleTypeDef exti_user_pb_handle;
-UART_HandleTypeDef uart_drv_handle;
+TIM_HandleTypeDef tim_drv_handle = {0};
+EXTI_HandleTypeDef exti_user_pb_handle = {0};
+UART_HandleTypeDef uart_drv_handle = {0};
+ADC_HandleTypeDef adc_drv_handle = {0};
 
 /***********************************************************************************************************************
  * LOCAL FUNCTIONS
@@ -274,6 +276,39 @@ static void bsp_uart_init(void)
 
     return;
 }
+
+static void bsp_adc_init(void)
+{
+    adc_drv_handle.Instance = ADC1;
+
+    adc_drv_handle.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV8;
+    adc_drv_handle.Init.Resolution = ADC_RESOLUTION_12B;
+    adc_drv_handle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    adc_drv_handle.Init.ScanConvMode = DISABLE;
+    adc_drv_handle.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+    adc_drv_handle.Init.ContinuousConvMode = DISABLE;
+    //adc_drv_handle.Init.NbrOfConversion
+    adc_drv_handle.Init.DiscontinuousConvMode = DISABLE;
+    //adc_drv_handle.Init.NbrOfDiscConversion
+    adc_drv_handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    //adc_drv_handle.Init.ExternalTrigConvEdge
+    adc_drv_handle.Init.DMAContinuousRequests = DISABLE;
+
+    adc_drv_handle.DMA_Handle = NULL;
+
+    HAL_ADC_Init(&adc_drv_handle);
+
+    ADC_ChannelConfTypeDef temp_sensor_channel = {0};
+    temp_sensor_channel.Channel = ADC_CHANNEL_TEMPSENSOR;
+    temp_sensor_channel.Rank = 1;
+    temp_sensor_channel.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+
+    HAL_ADC_ConfigChannel(&adc_drv_handle, &temp_sensor_channel);
+
+    return;
+}
+
+
 
 /***********************************************************************************************************************
  * MCU HAL FUNCTIONS
@@ -480,6 +515,18 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
     return;
 }
 
+void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc)
+{
+    __HAL_RCC_ADC1_CLK_ENABLE();
+    return;
+}
+
+void HAL_ADC_MspDeInit(ADC_HandleTypeDef *hadc)
+{
+    __HAL_RCC_ADC1_CLK_DISABLE();
+    return;
+}
+
 /***********************************************************************************************************************
  * API FUNCTIONS
  **********************************************************************************************************************/
@@ -489,6 +536,7 @@ uint32_t bsp_init(void)
     bsp_system_clock_config();
     bsp_tim2_init();
     bsp_uart_init();
+    bsp_adc_init();
 
     bsp_set_gpio(BSP_GPIO_ID_LD2, BSP_GPIO_LOW);
 
@@ -630,6 +678,52 @@ uint32_t bsp_register_getchar_cb(bsp_callback_t cb, void *cb_arg)
 {
     bsp_getchar_cb = cb;
     bsp_getchar_cb_arg = cb_arg;
+
+    return BSP_STATUS_OK;
+}
+
+#define STM32F401RE_V_25_MV                 (760)
+#define STM32F401RE_AVG_SLOPE_MV_PER_DEG_C  (2.5)
+#define V_REF_V                             (3.3)
+#define ADC_MV_PER_STEP                     (V_REF_V * 1000 / ((2 << 12) - 1))
+uint32_t bsp_read_temp(uint32_t *temp)
+{
+    uint32_t ret;
+
+    // Read raw temp value from ADC
+    HAL_ADC_Start(&adc_drv_handle);
+    ret = HAL_ADC_PollForConversion(&adc_drv_handle, 1000);
+    if (ret != HAL_OK)
+    {
+        return BSP_STATUS_FAIL;
+    }
+
+    *temp = HAL_ADC_GetValue(&adc_drv_handle);
+
+    HAL_ADC_Stop(&adc_drv_handle);
+
+    /*
+        Convert raw temp to celsius
+
+        From STM32F401RE Reference Manual (rm0368), Section 11.9
+
+        Equation:
+        Temperature in deg C = ((V_SENSE - V_25) / Avg_Slope) + 25
+
+        Parameters:
+        - V_SENSE = ADC value just read
+        - V_25 = Datasheet parameter V_SENSE value for 25 deg C = 0.76 V (see Datasheet Section 6.3.21)
+        - Avg_Slope = Datasheet parameter for avg slope of temperature vs V_SENSE curve = 2.5 mV/degC (see Datasheet Section 6.3.21)
+    */
+    float temp_float;
+    temp_float = (float) *temp;
+    temp_float *= V_REF_V * 1000;
+    temp_float /= ((1 << 12) - 1);
+    temp_float -= STM32F401RE_V_25_MV;
+    temp_float /= STM32F401RE_AVG_SLOPE_MV_PER_DEG_C;
+    temp_float += 25;
+
+    *temp = round(temp_float);
 
     return BSP_STATUS_OK;
 }

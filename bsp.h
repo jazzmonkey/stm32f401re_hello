@@ -84,6 +84,7 @@ uint32_t bsp_set_timer(uint32_t duration_ms, bsp_callback_t cb, void *cb_arg);
 uint32_t bsp_set_gpio(uint32_t gpio_id, uint8_t gpio_state);
 uint32_t bsp_register_user_pb_cb(bsp_callback_t cb, void *cb_arg);
 uint32_t bsp_register_getchar_cb(bsp_callback_t cb, void *cb_arg);
+uint32_t bsp_read_temp(uint32_t *temp);
 void bsp_sleep(void);
 
 /**********************************************************************************************************************/
