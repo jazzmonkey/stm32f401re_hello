@@ -19,9 +19,10 @@
 /***********************************************************************************************************************
  * INCLUDES
  **********************************************************************************************************************/
-#include "bsp.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include "bsp.h"
+#include "cli.h"
 
 /***********************************************************************************************************************
  * LOCAL LITERAL SUBSTITUTIONS
@@ -70,13 +71,6 @@ void app_timeout_callback(uint32_t status, void *arg)
     return;
 }
 
-void app_getchar_callback(uint32_t status, void *arg)
-{
-    app_getchar = true;
-
-    return;
-}
-
 /***********************************************************************************************************************
  * API FUNCTIONS
  **********************************************************************************************************************/
@@ -87,9 +81,9 @@ int main(void)
 
     bsp_init();
     bsp_register_user_pb_cb(app_pb_pressed_callback, NULL);
-    bsp_register_getchar_cb(app_getchar_callback, NULL);
     bsp_set_timer(500, app_timeout_callback, NULL);
-    printf("\n\rHello world!\n\r");
+    cli_init();
+    cli_command_register_callback('l', app_pb_pressed_callback, NULL);
 
     while (1)
     {
@@ -117,21 +111,6 @@ int main(void)
                 default:
                     break;
             }
-
-            uint32_t temp;
-            temp = 0;
-            bsp_read_temp(&temp);
-            printf("temp = %d\n\r", (int) temp);
-        }
-
-        __disable_irq();
-        temp_bool = app_getchar;
-        __enable_irq();
-
-        if (temp_bool)
-        {
-            app_getchar = false;
-            printf("%c", getchar());
         }
 
         __disable_irq();
@@ -171,6 +150,8 @@ int main(void)
             bsp_set_timer(timer_delay_ms, app_timeout_callback, NULL);
             app_ld2_state_on = !app_ld2_state_on;
         }
+
+        cli_step();
 
         bsp_sleep();
     }
