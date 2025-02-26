@@ -29,17 +29,55 @@
  **********************************************************************************************************************/
 #define CLI_STATE_INIT      (0)
 #define CLI_STATE_IDLE      (1)
-#define CLI_STATE_BUSY      (2)
+#define CLI_STATE_RX_CMD    (2)
+#define CLI_STATE_BUSY      (3)
+
+/***********************************************************************************************************************
+ * MACROS
+ **********************************************************************************************************************/
+
+/***********************************************************************************************************************
+ * ENUMS, STRUCTS, UNIONS, TYPEDEFS
+ **********************************************************************************************************************/
+typedef uint32_t (*command_handler_t)(void *command);
+
+typedef struct
+{
+    char command;
+    cli_callback_t cb;
+    void *cb_arg;
+    command_handler_t handler;
+} cli_command_t;
+
+typedef struct
+{
+    uint32_t state;
+    cli_command_t *current_command;
+    cli_command_t *command_list;
+    uint8_t total_commands;
+    volatile bool char_is_ready;
+    char new_char;
+} cli_t;
+
 
 /***********************************************************************************************************************
  * LOCAL VARIABLES
  **********************************************************************************************************************/
-static uint32_t cli_state = CLI_STATE_INIT;
-//static char cli_comamds[3] = {'t', 'l', 'e'};
-static volatile bool cli_getchar = false;
-static char cli_current_command = '0';
-static cli_callback_t l_command_cb = NULL;
-static void *l_command_cb_arg = NULL;
+static uint32_t cli_handle_unknown(void *command);
+static uint32_t cli_handle_t(void *command);
+static uint32_t cli_handle_l(void *command);
+static uint32_t cli_handle_e(void *command);
+static uint32_t cli_handle_qm(void *command);
+
+static cli_t cli;
+static cli_command_t command_list[] =
+{
+    {' ', NULL, NULL, cli_handle_unknown},
+    {'t', NULL, NULL, cli_handle_t},
+    {'l', NULL, NULL, cli_handle_l},
+    {'e', NULL, NULL, cli_handle_e},
+    {'?', NULL, NULL, cli_handle_qm},
+};
 
 /***********************************************************************************************************************
  * GLOBAL VARIABLES
@@ -50,7 +88,7 @@ static void *l_command_cb_arg = NULL;
  **********************************************************************************************************************/
 static void cli_getchar_callback(uint32_t status, void *arg)
 {
-    cli_getchar = true;
+    cli.char_is_ready = true;
 
     return;
 }
@@ -66,120 +104,160 @@ static void cli_print_commands(void)
     return;
 }
 
+static uint32_t cli_handle_unknown(void *command)
+{
+    printf("Unknown command: '%c'\n\r", cli.new_char);
+
+    cli.state = CLI_STATE_IDLE;
+
+    return CLI_OK;
+}
+
+static uint32_t cli_handle_t(void *command)
+{
+    uint32_t temp = 0;
+    bsp_read_temp(&temp);
+    printf("temp = %d\n\r", (int) temp);
+
+    cli.state = CLI_STATE_IDLE;
+
+    return CLI_OK;
+}
+
+static uint32_t cli_handle_l(void *command)
+{
+    cli_command_t *cmd = (cli_command_t *) command;
+    cmd->cb(CLI_OK, cmd->cb_arg);
+
+    cli.state = CLI_STATE_IDLE;
+
+    return CLI_OK;
+}
+
+static uint32_t cli_handle_e(void *command)
+{
+    if (cli.state == CLI_STATE_RX_CMD)
+    {
+        cli.state = CLI_STATE_BUSY;
+    }
+    else
+    {
+        if (cli.new_char == '0')
+        {
+            cli.state = CLI_STATE_IDLE;
+        }
+        else
+        {
+            printf("%c", cli.new_char);
+        }
+    }
+
+    return CLI_OK;
+}
+
+static uint32_t cli_handle_qm(void *command)
+{
+    cli_print_commands();
+
+    cli.state = CLI_STATE_IDLE;
+
+    return CLI_OK;
+}
+
 /***********************************************************************************************************************
  * API FUNCTIONS
  **********************************************************************************************************************/
 uint32_t cli_init(void)
 {
+    cli.state = CLI_STATE_IDLE;
+    cli.current_command = NULL;
+    cli.command_list = command_list;
+    cli.total_commands = sizeof(command_list)/sizeof(cli_command_t);
+    cli.char_is_ready = false;
+
     printf("stm32f401re_hello\n\r\n\r");
     cli_print_commands();
     printf("\n\r>");
 
     bsp_register_getchar_cb(cli_getchar_callback, NULL);
 
-    cli_state = CLI_STATE_IDLE;
-
     return CLI_OK;
 }
 
 uint32_t cli_get_state(uint32_t *state)
 {
-    *state = cli_state;
+    *state = cli.state;
 
     return CLI_OK;
 }
 
 uint32_t cli_step(void)
 {
+    uint32_t ret = CLI_OK;
+
     bool temp_bool;
     __disable_irq();
-    temp_bool = cli_getchar;
+    temp_bool = cli.char_is_ready;
     __enable_irq();
 
+    // Get any new character
     if (temp_bool)
     {
-        cli_getchar = false;
-        char temp_char = getchar();
+        cli.char_is_ready = false;
+        cli.new_char = getchar();
 
-        // Handle BUSY state
-        if (cli_state == CLI_STATE_BUSY)
+        // If CLI SM is IDLE, then Loop through command list to find matching
+        if (cli.state == CLI_STATE_IDLE)
         {
-            if (cli_current_command == 'e')
+            cli.state = CLI_STATE_RX_CMD;
+            cli.current_command = NULL;
+            for (int i = 0; i < cli.total_commands; i++)
             {
-                if  (temp_char == '0')
+                if (cli.new_char == cli.command_list[i].command)
                 {
-                    cli_state = CLI_STATE_IDLE;
-                }
-                else
-                {
-                    printf("%c", temp_char);
+                    cli.current_command = &(cli.command_list[i]);
                 }
             }
-        }
 
-        // Handle IDLE state
-        else if (cli_state == CLI_STATE_IDLE)
-        {
+            // Check if the command was found, if not assign Unkown handler
+            if (cli.current_command == NULL)
+            {
+                cli.current_command = &(cli.command_list[0]);
+            }
+
             printf("\n\r");
-            switch (temp_char)
-            {
-                case 't':
-                {
-                    uint32_t temp = 0;
-                    bsp_read_temp(&temp);
-                    printf("temp = %d\n\r", (int) temp);
-                    cli_state = CLI_STATE_IDLE;
-                    break;
-                }
-
-                case 'e':
-                    cli_current_command = temp_char;
-                    cli_state = CLI_STATE_BUSY;
-                    break;
-
-                case 'l':
-                    l_command_cb(CLI_OK, l_command_cb_arg);
-                    cli_state = CLI_STATE_IDLE;
-                    break;
-
-                case '?':
-                    cli_print_commands();
-                    cli_state = CLI_STATE_IDLE;
-                    break;
-
-                default:
-                    printf("Unknown command: '%c'\n\r", temp_char);
-                    cli_state = CLI_STATE_IDLE;
-                    break;
-            }
         }
 
-        if (cli_state == CLI_STATE_IDLE)
+        // current_command will be guaranteed not to be NULL, but check anyway
+        if (cli.current_command != NULL)
         {
-            printf("\n\r>");
+            ret = cli.current_command->handler(cli.current_command);
+            if (cli.state == CLI_STATE_IDLE)
+            {
+                printf("\n\r>");
+            }
         }
     }
 
-    return CLI_OK;
+    return ret;
 }
 
 uint32_t cli_command_register_callback(char command, cli_callback_t cb, void *cb_arg)
 {
-    // Check for valid command
-    if (command == 'l')
+    for (int i = 0; i < cli.total_commands; i++)
     {
-        l_command_cb = cb;
-        l_command_cb_arg = cb_arg;
-    }
-    else
-    {
-        return CLI_FAIL;
-    }
-
-    // Check for NULL pointers
-    if (cb == NULL)
-    {
-        return CLI_FAIL;
+        if (command == cli.command_list[i].command)
+        {
+            if (cb == NULL)
+            {
+                return CLI_FAIL;
+            }
+            else
+            {
+                cli.command_list[i].cb = cb;
+                cli.command_list[i].cb_arg = cb_arg;
+            }
+        }
     }
 
     return CLI_OK;
